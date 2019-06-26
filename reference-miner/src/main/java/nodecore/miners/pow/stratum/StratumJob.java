@@ -1,7 +1,6 @@
 package nodecore.miners.pow.stratum;
 
-import org.veriblock.core.crypto.Crypto;
-import org.veriblock.core.utilities.Utility;
+import nodecore.miners.pow.Utility;
 
 import java.nio.ByteBuffer;
 
@@ -47,11 +46,10 @@ public class StratumJob {
     }
 
     private byte[] calculateMerkleRoot(long extraNonce) {
-        Crypto c = new Crypto();
-        byte[] txRoot = c.SHA256ReturnBytes(Utility.concat(Utility.hexToBytes(intermediateMerkles[0]), Utility.hexToBytes(intermediateMerkles[1])));
-        byte[] metapackage = c.SHA256ReturnBytes(Utility.concat(Utility.hexToBytes(intermediateMerkles[2]), Utility.longToByteArray(extraNonce)));
+        byte[] txRoot = Utility.sha256(Utility.hexToBytes(intermediateMerkles[0]), Utility.hexToBytes(intermediateMerkles[1]));
+        byte[] metapackage = Utility.sha256(Utility.hexToBytes(intermediateMerkles[2]), Utility.longToByteArray(extraNonce));
 
-        byte[] merkleRoot = c.SHA256ReturnBytes(Utility.concat(metapackage, txRoot));
+        byte[] merkleRoot = Utility.sha256(metapackage, txRoot);
         byte[] trimmed = new byte[16];
         System.arraycopy(merkleRoot, 0, trimmed, 0, trimmed.length);
 

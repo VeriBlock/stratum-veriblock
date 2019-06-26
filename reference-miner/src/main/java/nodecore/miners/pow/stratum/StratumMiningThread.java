@@ -1,9 +1,9 @@
 package nodecore.miners.pow.stratum;
 
+import nodecore.miners.pow.Utility;
+import nodecore.miners.pow.VBlake;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.veriblock.core.crypto.vBlake;
-import org.veriblock.core.utilities.Utility;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
@@ -69,7 +69,7 @@ public class StratumMiningThread extends Thread {
                 }
 
                 work.putInt(60, nonce);
-                byte[] hash = vBlake.hash(work.array());
+                byte[] hash = VBlake.hash(work.array());
                 BigInteger hashVal = new BigInteger(1, hash);
                 if (hashVal.compareTo(TARGET) < 0) {
                     logger.info("Header: {}", Utility.bytesToHex(work.array()));
