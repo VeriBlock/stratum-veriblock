@@ -3,6 +3,7 @@ from twisted.internet import defer
 
 from stratum.services import GenericService, admin
 from stratum.pubsub import Pubsub
+import stratum.settings as settings
 from .interfaces import Interfaces
 from .subscription import MiningSubscription
 from lib.exceptions import SubmitException
@@ -46,7 +47,7 @@ class MiningService(GenericService):
 
         session = self.connection_ref().get_session()
         session['extranonce'] = extranonce
-        session['difficulty'] = 1 # Following protocol specs, default diff is 1
+        session['difficulty'] = settings.POOL_TARGET
 
         return Pubsub.subscribe(self.connection_ref(), MiningSubscription()) + (extranonce_hex, extranonce_size)
 
@@ -69,7 +70,7 @@ class MiningService(GenericService):
         difficulty = session['difficulty']
         submit_time = Interfaces.timestamper.time()
 
-        Interfaces.share_limiter.submit(self.connection_ref, difficulty, submit_time)
+        Interfaces.share_limiter.submit(self.connection_ref, job_id, difficulty, submit_time, worker_name)
 
         # This checks if submitted share meet all requirements
         # and it is valid proof of work.

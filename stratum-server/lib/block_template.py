@@ -65,8 +65,8 @@ class BlockTemplate:
         self.timestamp = 0
         self.nonce = 0
 
-        difficulty = util.uint256_from_compact(self.nBits)
-        self.target = self.diff_to_target(difficulty)
+        self.difficulty = util.uint256_from_compact(self.nBits)
+        self.target = self.diff_to_target(self.difficulty)
 
         self.broadcast_args = self.build_broadcast_args()
 

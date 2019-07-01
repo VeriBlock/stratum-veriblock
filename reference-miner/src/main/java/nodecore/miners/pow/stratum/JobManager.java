@@ -3,6 +3,7 @@ package nodecore.miners.pow.stratum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +21,7 @@ public class JobManager {
         this.client = client;
         this.client.setSubscribeHandler(this::onSubscribed);
         this.client.setJobHandler(this::onJob);
+        this.client.setDifficultyChangedHandler(this::onDifficultyChanged);
     }
 
     public void start(int workerCount) throws InterruptedException {
@@ -53,6 +55,14 @@ public class JobManager {
         synchronized (workers) {
             for (StratumMiningThread worker : workers) {
                 worker.setJob(job);
+            }
+        }
+    }
+
+    private void onDifficultyChanged(BigInteger difficulty) {
+        synchronized (workers) {
+            for (StratumMiningThread worker : workers) {
+                worker.setDifficulty(difficulty);
             }
         }
     }

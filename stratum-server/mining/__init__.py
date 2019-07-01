@@ -2,6 +2,7 @@ import time
 
 from .service import MiningService
 from .subscription import MiningSubscription
+from lib.basic_share_limiter import BasicShareLimiter
 from twisted.internet import defer, reactor
 
 @defer.inlineCallbacks
@@ -29,13 +30,18 @@ def setup(on_startup):
     factory = UCPClientFactory(veriblock_ucp)
     log.info('Waiting for VeriBlock UCP...')
 
+    share_limiter = BasicShareLimiter()
+
+    log.info("Limiter initialized")
     registry = TemplateRegistry(veriblock_ucp,
                                 settings.INSTANCE_ID,
                                 MiningSubscription.on_template,
-                                Interfaces.share_manager.on_network_block)
+                                Interfaces.share_manager.on_network_block,
+                                share_limiter.update_network_difficulty)
 
     # Template registry is the main interface between Stratum service
     # and pool core logic
+    Interfaces.set_share_limiter(share_limiter)
     Interfaces.set_template_registry(registry)
 
     veriblock_ucp.set_mining_job_callback(registry.add_template)

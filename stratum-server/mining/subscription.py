@@ -30,16 +30,16 @@ class MiningSubscription(Subscription):
     def _finish_after_subscribe(self, result):
         '''Send new job to newly subscribed client'''
         try:
+            session = self.connection_ref().get_session()
+            difficulty = session['difficulty']
+            self.connection_ref().rpc('mining.set_difficulty', [str(difficulty), ], is_notification=True)
+
             (job_id, height, version, prevhash, prevkeystone, secondkeystone, intermediate_merkles, time, difficulty, clean_jobs) = \
                         Interfaces.template_registry.get_last_broadcast_args()
+
         except Exception:
             log.error("Template not ready yet")
             return result
-
-        # Force set higher difficulty
-        # TODO
-        #self.connection_ref().rpc('mining.set_difficulty', [2,], is_notification=True)
-        #self.connection_ref().rpc('client.get_version', [])
 
         # Force client to remove previous jobs if any (eg. from previous connection)
         clean_jobs = True

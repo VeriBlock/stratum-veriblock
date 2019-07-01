@@ -32,7 +32,7 @@ class TemplateRegistry(object):
     service and implements block validation and submits.'''
 
     def __init__(self, protocol, instance_id,
-                 on_template_callback, on_block_callback):
+                 on_template_callback, on_block_callback, on_difficulty_callback):
         self.prevhashes = {}
         self.jobs = weakref.WeakValueDictionary()
 
@@ -42,6 +42,7 @@ class TemplateRegistry(object):
         self.protocol = protocol
         self.on_block_callback = on_block_callback
         self.on_template_callback = on_template_callback
+        self.on_difficulty_callback = on_difficulty_callback
 
         self.last_block = None
         self.update_in_progress = False
@@ -91,6 +92,7 @@ class TemplateRegistry(object):
         if new_block:
             # Tell the system about new block
             # It is mostly important for share manager
+            self.on_difficulty_callback(block.difficulty)
             self.on_block_callback(prevhash)
 
         # Everything is ready, let's broadcast jobs!
@@ -98,7 +100,8 @@ class TemplateRegistry(object):
 
     def diff_to_target(self, difficulty):
         '''Converts difficulty to target'''
-        diff1 = 0x000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+        # Max Value / Difficulty = Target
+        diff1 = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
         return diff1 / difficulty
 
     def get_job(self, job_id):

@@ -14,12 +14,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class StratumMiningThread extends Thread {
     private static final Logger logger = LoggerFactory.getLogger(StratumMiningThread.class);
 
-    private static final BigInteger TARGET = new BigInteger("000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 16);
+    private static final BigInteger MAX_TARGET = new BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", 16);
     private final Consumer<StratumJob, Long, byte[]> submitFunc;
     private boolean running = false;
     private AtomicBoolean jobUpdated = new AtomicBoolean(false);
     private long extraNonce;
     private StratumJob job;
+
+    private BigInteger target;
+    public void setDifficulty(BigInteger difficulty) {
+        target = MAX_TARGET.divide(difficulty);
+    }
 
     public void setExtraNonce(long extraNonce) {
         this.extraNonce = extraNonce;
@@ -71,7 +76,7 @@ public class StratumMiningThread extends Thread {
                 work.putInt(60, nonce);
                 byte[] hash = VBlake.hash(work.array());
                 BigInteger hashVal = new BigInteger(1, hash);
-                if (hashVal.compareTo(TARGET) < 0) {
+                if (hashVal.compareTo(this.target) < 0) {
                     logger.info("Header: {}", Utility.bytesToHex(work.array()));
                     logger.info("Found share: {}", Utility.bytesToHex(hash));
                     // Submit Share

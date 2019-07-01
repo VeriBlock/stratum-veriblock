@@ -1,10 +1,8 @@
 import time
 
 from twisted.internet import defer
-import stratum.settings as settings
+from stratum import settings
 import stratum.logger as logger
-
-from mining.interfaces import Interfaces
 
 log = logger.get_logger('BasicShareLimiter')
 
@@ -39,6 +37,28 @@ class SpeedBuffer:
     def size(self):
         return self.cur
 
+class SpeedBufferFull:
+    def __init__(self, n):
+        raise "you should use SpeedBuffer"
+
+    def append(self, x):
+        self.data[self.cur] = x
+        self.cur = (self.cur + 1) % self.max
+
+    def avg(self):
+        return sum(self.data) / self.max
+
+    def pos(self):
+        return self.cur
+
+    def clear(self):
+        self.data = []
+        self.cur = 0
+        self.__class__ = SpeedBuffer
+
+    def size(self):
+        return self.max
+
 class BasicShareLimiter(object):
     def __init__(self):
         self.worker_stats = {}
@@ -49,7 +69,7 @@ class BasicShareLimiter(object):
         self.tmax = self.target + self.variance
         self.buffersize = self.retarget / self.target * 4
 
-        self.network_diff = settings.INITIAL_NETWORK_DIFF
+        self.network_diff = settings.VDIFF_MAX_TARGET
 
         # self.litecoin = {}
         # TODO: trim the hash of inactive workers
@@ -58,21 +78,20 @@ class BasicShareLimiter(object):
         # Update the network difficulty
         self.network_diff = difficulty
 
-    # @defer.inlineCallbacks
-    # def update_litecoin_difficulty(self):
-    #     # Cache the litecoin difficulty so we do not have to query it on every submit
-    #     # Update the difficulty  if it is out of date or not set
-    #     if 'timestamp' not in self.litecoin or self.litecoin['timestamp'] < int(time.time()) - settings.DIFF_UPDATE_FREQUENCY:
-    #         self.litecoin['timestamp'] = time.time()
-    #         self.litecoin['difficulty'] = (yield Interfaces.template_registry.bitcoin_rpc.getdifficulty())
-    #         log.debug("Updated litecoin difficulty to %s" %  (self.litecoin['difficulty']))
-    #     self.litecoin_diff = self.litecoin['difficulty']
+    def calc_ddiff(current_difficulty, target, avg):
+        # Figure out our Delta-Diff
+        if settings.VDIFF_FLOAT:
+            ddiff = float((float(current_difficulty) * (float(self.target) / float(avg))) - current_difficulty)
+        else:
+            ddiff = int((float(current_difficulty) * (float(self.target) / float(avg))) - current_difficulty)
+
+        return ddiff
 
     def submit(self, connection_ref, job_id, current_difficulty, timestamp, worker_name):
         ts = int(timestamp)
 
         # Init the stats for this worker if it isn't set.
-        if worker_name not in self.worker_stats or self.worker_stats[worker_name]['last_ts'] < ts - settings.DB_USERCACHE_TIME :
+        if worker_name not in self.worker_stats: # or self.worker_stats[worker_name]['last_ts'] < ts - settings.DB_USERCACHE_TIME :
             self.worker_stats[worker_name] = {'last_rtc': (ts - self.retarget / 2), 'last_ts': ts, 'buffer': SpeedBuffer(self.buffersize) }
             # dbi.update_worker_diff(worker_name, settings.POOL_TARGET)
             return
@@ -95,12 +114,6 @@ class BasicShareLimiter(object):
             log.warning("Reseting avg = 1 since it's SOOO low")
             avg = 1
 
-        # Figure out our Delta-Diff
-        if settings.VDIFF_FLOAT:
-            ddiff = float((float(current_difficulty) * (float(self.target) / float(avg))) - current_difficulty)
-        else:
-            ddiff = int((float(current_difficulty) * (float(self.target) / float(avg))) - current_difficulty)
-
         if avg > self.tmax:
             # For fractional -0.1 ddiff's just drop by 1
             if settings.VDIFF_X2_TYPE:
@@ -109,6 +122,7 @@ class BasicShareLimiter(object):
                 if (ddiff * current_difficulty) < settings.VDIFF_MIN_TARGET:
                     ddiff = settings.VDIFF_MIN_TARGET / current_difficulty
             else:
+                ddiff = BasicShareLimiter.calc_ddiff(current_difficulty, self.target, avg)
                 if ddiff > -settings.VDIFF_MIN_CHANGE:
                     ddiff = -settings.VDIFF_MIN_CHANGE
                 # Don't drop below POOL_TARGET
@@ -123,6 +137,7 @@ class BasicShareLimiter(object):
                 if (ddiff * current_difficulty) > diff_max:
                     ddiff = diff_max / current_difficulty
             else:
+                ddiff = BasicShareLimiter.calc_ddiff(current_difficulty, self.target, avg)
                 if ddiff < settings.VDIFF_MIN_CHANGE:
                    ddiff = settings.VDIFF_MIN_CHANGE
 
@@ -145,12 +160,6 @@ class BasicShareLimiter(object):
 
         # TODO: Evaluate
         session = connection_ref().get_session()
-
-        (job_id, prevhash, coinb1, coinb2, merkle_branch, version, nbits, ntime, _) = \
-            Interfaces.template_registry.get_last_broadcast_args()
-        work_id = Interfaces.worker_manager.register_work(worker_name, job_id, new_diff)
-
         session['difficulty'] = new_diff
-        connection_ref().rpc('mining.set_difficulty', [new_diff, ], is_notification=True)
-        connection_ref().rpc('mining.notify', [work_id, prevhash, coinb1, coinb2, merkle_branch, version, nbits, ntime, False, ], is_notification=True)
-        dbi.update_worker_diff(worker_name, new_diff)
+        connection_ref().rpc('mining.set_difficulty', [str(new_diff), ], is_notification=True)
+        # dbi.update_worker_diff(worker_name, new_diff)

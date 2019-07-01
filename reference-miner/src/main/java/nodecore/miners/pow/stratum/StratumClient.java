@@ -9,6 +9,7 @@ import nodecore.miners.pow.Utility;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.*;
@@ -36,6 +37,11 @@ public class StratumClient {
     private Consumer<StratumJob> jobHandler;
     public void setJobHandler(Consumer<StratumJob> jobHandler) {
         this.jobHandler = jobHandler;
+    }
+
+    private Consumer<BigInteger> difficultyChangedHandler;
+    public void setDifficultyChangedHandler(Consumer<BigInteger> difficultyChangedHandler) {
+        this.difficultyChangedHandler = difficultyChangedHandler;
     }
 
     public Integer nextRequestId() {
@@ -175,6 +181,12 @@ public class StratumClient {
 
             if (jobHandler != null) {
                 jobHandler.accept(job);
+            }
+        } else if (json.get("method").getAsString().equals("mining.set_difficulty")) {
+            JsonArray params = json.getAsJsonArray("params");
+
+            if (difficultyChangedHandler != null) {
+                difficultyChangedHandler.accept(new BigInteger(params.get(0).getAsString()));
             }
         }
     }
